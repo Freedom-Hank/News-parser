@@ -1,0 +1,40 @@
+name: Daily News Scraper
+
+on:
+  schedule:
+    # GitHub 使用 UTC 時間，台灣是 UTC+8
+    # 所以設定 UTC 22:00 = 台灣早上 06:00
+    - cron: '0 22 * * *'
+  # 允許你手動按按鈕觸發 (方便測試)
+  workflow_dispatch:
+
+jobs:
+  scrape-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code (下載程式碼)
+        uses: actions/checkout@v3
+
+      - name: Set up Python (安裝 Python)
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies (安裝套件)
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Crawler (執行爬蟲 - 這裡我們用 1 天就好，因為是每天跑)
+        # 這裡可以直接傳參數給 python，或是你去改 python 檔預設值
+        run: python News_crawler.py
+        # 注意：你需要確認 News_crawler.py 裡的 DAYS_TO_CRAWL 設為 1 (或動態調整)
+      
+      - name: Run Cleaner (執行清洗)
+        run: python News_cleaner.py
+
+      - name: Run Uploader (上傳 Firebase)
+        env:
+          # 把 GitHub Secret 注入到環境變數，讓 Python 讀得到
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python news_uploader.py
