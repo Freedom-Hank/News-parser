@@ -1,0 +1,9 @@
+requests
+beautifulsoup4
+pandas
+selenium
+webdriver-manager
+firebase-admin
+jieba
+streamlit
+plotly

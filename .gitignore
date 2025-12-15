@@ -1,0 +1,5 @@
+# --- 絕對不能上傳的金鑰 ---
+serviceAccountKey.json
+
+# --- 編輯器設定檔 (VS Code) ---
+.vscode/
