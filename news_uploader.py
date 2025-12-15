@@ -2,6 +2,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app
 import json
 import os
+import hashlib
 
 # --- 設定區 ---
 JSON_FILE = "cleaned_news.json"
@@ -56,10 +57,17 @@ def upload_to_firebase():
         chunk = news_list[i : i + batch_size]
         
         for news in chunk:
-            # 使用 document() 不帶參數，讓 Firestore 自動產生亂數 ID
-            # 也可以用 document(news['link']) 把網址當 ID (可防止重複)
-            doc_ref = db.collection(COLLECTION_NAME).document() 
-            batch.set(doc_ref, news)
+            # 1. 拿出這篇新聞的連結
+            link = news.get('link')
+            
+            if link:
+                # 2. 把網址轉成 MD5 編碼 (例如: 'https://...' -> 'a1b2c3d4...')
+                # 這樣做是因為網址太長且含特殊符號，不適合直接當 Document ID
+                doc_id = hashlib.md5(link.encode('utf-8')).hexdigest()
+                
+                # 3. 指定 ID 寫入 (如果有重複的 ID，就會變成更新，不會新增)
+                doc_ref = db.collection(COLLECTION_NAME).document(doc_id)
+                batch.set(doc_ref, news)
             
         # 提交這一個批次
         batch.commit()

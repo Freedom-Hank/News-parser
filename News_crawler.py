@@ -29,23 +29,20 @@ def get_news_links_by_date(date_str):
     url = f"https://www.ettoday.net/news/news-list-{date_str}-0.htm"
     print(f"\n📡 [Selenium] 正在開啟瀏覽器抓取列表: {url}")
     
-    # 格式化日期以便比對 (ETtoday 網頁顯示的是 2024/03/20，而我們輸入的是 2024-03-20)
     target_date_slash = date_str.replace("-", "/") 
     
     chrome_options = Options()
     chrome_options.add_argument("--disable-gpu")
-    # chrome_options.add_argument("--headless") # 建議除錯時先關掉 headless
+    # chrome_options.add_argument("--headless") 
+
+    html_source = "" # 1. 先宣告這個變數
 
     try:
         driver = webdriver.Chrome(
             service=Service(ChromeDriverManager().install()), 
             options=chrome_options
         )
-    except Exception as e:
-        print(f"❌ 瀏覽器啟動失敗: {e}")
-        return []
-    
-    try:
+        
         driver.get(url)
         time.sleep(2)
         
@@ -54,34 +51,26 @@ def get_news_links_by_date(date_str):
         MAX_RETRIES = 3
         
         while True:
-            # 1. 執行捲動
+            # 捲動邏輯
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(0.5)
+            driver.execute_script("window.scrollBy(0, -300);")
             time.sleep(2)
             
-            # --- 新增邏輯：檢查最後一則新聞的日期 ---
+            # 日期檢查
             try:
-                # 抓取畫面上所有的日期標籤 (.date)
                 date_elements = driver.find_elements(By.CSS_SELECTOR, ".part_list_2 .date")
-                
                 if date_elements:
-                    # 抓最後一個元素的文字 (例如: "2024/03/20 12:30")
                     last_date_text = date_elements[-1].text.strip()
-                    
-                    # 取出日期部分 (前面 10 個字: "2024/03/20")
                     current_date_on_page = last_date_text[:10]
-                    
-                    # 比對：如果頁面上的最後日期 不等於 目標日期 (代表已經滑過頭，滑到前一天了)
                     if current_date_on_page != target_date_slash:
                         print(f"   🛑 偵測到前一日新聞 ({last_date_text})，停止捲動。")
                         break
-            except Exception as e:
-                # 偶爾抓不到元素不影響大局，繼續滑
+            except Exception:
                 pass
-            # -------------------------------------
 
-            # 2. 檢查高度是否變化 (原本的重試邏輯)
+            # 高度檢查
             new_height = driver.execute_script("return document.body.scrollHeight")
-            
             if new_height == last_height:
                 retry_count += 1
                 print(f"   ⚠️ 高度未變化，第 {retry_count}/{MAX_RETRIES} 次重試...")
@@ -94,25 +83,33 @@ def get_news_links_by_date(date_str):
             else:
                 retry_count = 0
                 last_height = new_height
-                
+        
+        # 2.在瀏覽器還活著的時候，把原始碼存進變數
+        print("   📥 正在下載網頁原始碼...")
+        html_source = driver.page_source 
+
     except Exception as e:
         print(f"⚠️ Selenium 執行期間發生錯誤: {e}")
         return []
+    
     finally:
         if 'driver' in locals():
             driver.quit()
         
     # --- 解析 HTML ---
-    html_source = driver.page_source if 'driver' in locals() else ""
+    
+    # 3. 絕對不要再呼叫 driver.page_source，直接用上面存好的 html_source
+    if not html_source:
+        print("❌ 未取得網頁原始碼，跳過解析。")
+        return []
+
     soup = BeautifulSoup(html_source, "html.parser")
     
     news_list = []
-    # 這裡也要做過濾，確保最後存進去的真的只有當天的
     for item in soup.select(".part_list_2 > h3"):
         try:
-            date_time = item.select_one(".date").text.strip() # "2024/03/20 12:30"
+            date_time = item.select_one(".date").text.strip()
             
-            # 二次確認：只收錄當天日期
             if target_date_slash not in date_time:
                 continue
 

@@ -8,20 +8,25 @@ import jieba.analyse
 INPUT_FILE = "ettoday_raw_data.csv"
 OUTPUT_JSON = "cleaned_news.json"
 
-# --- 關鍵修正：定義「垃圾詞」黑名單 ---
-# 這些詞雖然出現頻率高，但對分析沒幫助，我們要把它們過濾掉
+#定義「垃圾詞」黑名單 ---
+# 這些詞雖然出現頻率高，但對分析沒幫助，要把它們過濾掉
 STOP_WORDS = {
     "記者", "報導", "翻攝", "圖文", "採訪", "綜合", "中心", "編輯", 
     "來源", "畫面", "曝光", "指出", "表示", "認為", "今日", "昨日",
-    "台灣", "台北", "ETtoday", "新聞雲", "可以", "我們", "應該"
+    "台灣", "台北", "ETtoday", "新聞雲", "可以", "我們", "應該","一起",
+    "這些", "那些", "非常", "非常", "很多", "看到", "知道", "時間",
+    "地方", "事情", "問題", "原因", "方式", "方法", "情況", "情形",
+    "活動", "公司", "政府", "民眾", "學生", "家人", "朋友", "生活", "工作",
+    "社會", "文化", "經濟", "政治", "國際", "地區", "地點", "地球","世界",
+    "新聞", "報導", "消息", "資訊", "資料", "內容", "標題", "文章","快訊",
+    "影片", "圖片", "照片", "網友", "留言", "分享", "關注", "熱門",
 }
 
 def extract_keywords_from_text(text):
     if not text or pd.isna(text):
         return []
     
-    # 擴大候選範圍到 20 個，因為我們會過濾掉很多東西
-    raw_keywords = jieba.analyse.extract_tags(text, topK=20)
+    raw_keywords = jieba.analyse.extract_tags(text, topK=50)
     
     filtered_keywords = []
     for w in raw_keywords:
@@ -46,8 +51,16 @@ def extract_reporter(content):
         if match:
             name = match.group(1).strip()
             # 排除明顯錯誤的結果
-            if len(name) > 5 or any(x in name for x in ["中心", "報導", "綜合"]): 
+            
+            # 1. 符號檢查：名字裡不該有標點符號 (過濾掉 "會。(圖")
+            if any(char in name for char in ["(", ")", "。", "、", "，", "！", "?", "【", "】", "／", "/"]):
                 continue
+            
+            # 2. 長度檢查：太短或太長都不像人名
+            # 中文名通常 2-4 字，英文名(如 Kolas) 可能長一點，但不會太長
+            if len(name) < 2 or len(name) > 10:
+                continue
+
             return name
     return "Unknown"
 
