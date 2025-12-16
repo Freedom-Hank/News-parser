@@ -176,6 +176,9 @@ mask = df['category'].isin(selected_cats)
 if len(date_range) == 2:
     mask = mask & (df['date_obj'].dt.date >= date_range[0]) & (df['date_obj'].dt.date <= date_range[1])
 
+if selected_reporters:
+    mask = mask & (df['reporter'].isin(selected_reporters))
+
 filtered_df = df[mask]
 
 # === 關鍵指標區 (KPI Metrics) ===
