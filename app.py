@@ -4,6 +4,9 @@ from firebase_admin import credentials, firestore, initialize_app
 import pandas as pd
 import plotly.express as px
 import os
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+
 
 # --- 1. 初始化 Firebase (只執行一次) ---
 # Streamlit 會在每次互動時重跑整個腳本，所以要檢查是否已經初始化
@@ -47,122 +50,129 @@ def load_data():
     return df
 
 # --- 3. 介面開始 ---
-st.set_page_config(page_title="新聞分析系統", layout="wide")
-st.title("📰 新聞資料分析系統")
+st.set_page_config(
+    page_title="ETtoday 新聞輿情戰情室",
+    page_icon="📰",
+    layout="wide", # 寬螢幕模式
+    initial_sidebar_state="expanded"
+)
+
+# === 標題與簡介 ===
+st.title("📰 ETtoday 新聞輿情戰情室")
+st.markdown("---")
 
 # 載入資料
-with st.spinner('正在從 Firebase 載入資料...'):
-    df = load_data()
-
+df = load_data()
 if df.empty:
-    st.error("⚠️ 資料庫是空的！請先執行爬蟲與上傳程式。")
+    st.warning("目前沒有資料，請確認資料庫狀態。")
     st.stop()
 
-# --- 側邊欄：全域篩選器 ---
-st.sidebar.header("🔍 篩選條件")
-
-# 時間處理：確保有資料才抓日期
-if 'date_obj' in df.columns and not df['date_obj'].isnull().all():
-    min_date = df['date_obj'].min().date()
-    max_date = df['date_obj'].max().date()
+# === 側邊欄：全域控制中心 ===
+with st.sidebar:
+    st.header("⚙️ 篩選控制")
     
-    start_date, end_date = st.sidebar.date_input(
-        "選擇時間區間",
-        [min_date, max_date],
-        min_value=min_date,
-        max_value=max_date
-    )
+    # 1. 日期篩選
+    if 'date_obj' in df.columns:
+        min_date = df['date_obj'].min().date()
+        max_date = df['date_obj'].max().date()
+        date_range = st.date_input("📅 選擇日期區間", [min_date, max_date])
     
-    # 根據時間過濾
-    mask = (df['date_obj'].dt.date >= start_date) & (df['date_obj'].dt.date <= end_date)
-    filtered_df = df[mask]
-else:
-    st.sidebar.warning("日期格式解析失敗，顯示所有資料")
-    filtered_df = df
+    # 2. 類別篩選 (多選)
+    all_categories = sorted(df['category'].unique())
+    selected_cats = st.multiselect("🏷️ 選擇新聞類別", all_categories, default=all_categories)
+    
+    st.info(f"資料來源：ETtoday\n總筆數：{len(df)} 筆")
 
-st.sidebar.info(f"顯示筆數：{len(filtered_df)} / {len(df)}")
+# === 資料過濾邏輯 ===
+# 根據使用者的篩選條件產生 filtered_df
+mask = df['category'].isin(selected_cats)
+if len(date_range) == 2:
+    mask = mask & (df['date_obj'].dt.date >= date_range[0]) & (df['date_obj'].dt.date <= date_range[1])
 
-# --- 主畫面：定義 4 個分頁 ---
-tab1, tab2, tab3, tab4 = st.tabs(["📊 總體概況", "🏆 記者分析", "🔑 關鍵詞分析", "🔎 資料瀏覽"])
+filtered_df = df[mask]
 
-# === Tab 1: 總體概況 ===
+# === 關鍵指標區 (KPI Metrics) ===
+# 用三欄排版顯示大數字
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("總文章數", f"{len(filtered_df)} 篇")
+with col2:
+    # 算出最活躍記者
+    top_reporter = filtered_df['reporter'].mode()[0] if not filtered_df.empty else "N/A"
+    st.metric("🔥 最活躍記者", top_reporter)
+with col3:
+    st.metric("涵蓋類別數", f"{filtered_df['category'].nunique()} 類")
+with col4:
+    # 算出出現最多的關鍵詞
+    # (這裡簡化處理，實際建議拉出來算)
+    st.metric("⭐ 關鍵詞焦點", "請看下方分析")
+
+st.markdown("---")
+
+# === 主內容分頁 ===
+tab1, tab2, tab3, tab4 = st.tabs(["📈 趨勢總覽", "🏆 記者戰力榜", "☁️ 關鍵詞雲", "🗃️ 詳細資料庫"])
+
 with tab1:
-    st.header("新聞類別分布")
-    if not filtered_df.empty:
-        category_counts = filtered_df['category'].value_counts().reset_index()
-        category_counts.columns = ['類別', '數量']
-        fig_cat = px.pie(category_counts, values='數量', names='類別', title='新聞類別佔比')
-        st.plotly_chart(fig_cat, use_container_width=True)
-    else:
-        st.info("此區間無資料")
+    col_a, col_b = st.columns([2, 1])
+    with col_a:
+        st.subheader("各類別新聞數量佔比")
+        cat_counts = filtered_df['category'].value_counts().reset_index()
+        cat_counts.columns = ['類別', '數量']
+        fig_pie = px.pie(cat_counts, values='數量', names='類別', hole=0.4) # 甜甜圈圖比較潮
+        st.plotly_chart(fig_pie, use_container_width=True)
+    with col_b:
+        st.subheader("每日文章量趨勢")
+        # 依日期分組統計
+        daily_counts = filtered_df.groupby(filtered_df['date_obj'].dt.date).size().reset_index(name='文章數')
+        fig_line = px.line(daily_counts, x='date_obj', y='文章數', markers=True)
+        st.plotly_chart(fig_line, use_container_width=True)
 
-# === Tab 2: 記者分析 ===
 with tab2:
-    if not filtered_df.empty:
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.subheader("🔥 活躍記者 Top 10")
-            reporter_counts = filtered_df['reporter'].value_counts().head(10).reset_index()
-            reporter_counts.columns = ['記者姓名', '文章數量']
-            reporter_counts = reporter_counts[reporter_counts['記者姓名'] != 'Unknown']
-            fig_rep = px.bar(reporter_counts, x='記者姓名', y='文章數量', color='文章數量')
-            st.plotly_chart(fig_rep, use_container_width=True)
+    st.subheader("記者產量 Top 20")
+    reporter_counts = filtered_df['reporter'].value_counts().head(20).reset_index()
+    reporter_counts.columns = ['記者', '文章數']
+    reporter_counts = reporter_counts[reporter_counts['記者'] != 'Unknown']
+    
+    fig_bar = px.bar(reporter_counts, x='文章數', y='記者', orientation='h', color='文章數')
+    fig_bar.update_layout(yaxis={'categoryorder':'total ascending'}) # 讓長條圖由大排到小
+    st.plotly_chart(fig_bar, use_container_width=True)
 
-        with col2:
-            st.subheader("🕵️ 記者屬性透視")
-            reporters = sorted(filtered_df['reporter'].unique().tolist())
-            if 'Unknown' in reporters: reporters.remove('Unknown')
-            
-            if reporters:
-                selected_reporter = st.selectbox("選擇記者", reporters)
-                rep_articles = filtered_df[filtered_df['reporter'] == selected_reporter]
-                st.metric("文章數", len(rep_articles))
-                st.write("關注領域：")
-                st.bar_chart(rep_articles['category'].value_counts())
-    else:
-        st.info("此區間無資料")
-
-# === Tab 3: 關鍵詞分析 ===
 with tab3:
-    st.header("熱門關鍵詞分析")
-    if not filtered_df.empty and 'keywords' in filtered_df.columns:
-        all_keywords = []
-        for keywords in filtered_df['keywords']:
-            if isinstance(keywords, list):
-                all_keywords.extend(keywords)
+    st.subheader("熱門關鍵詞文字雲")
+    # 這裡需要把所有 keywords 串接起來
+    all_words = []
+    for k in filtered_df['keywords']:
+        if isinstance(k, list): all_words.extend(k)
+    
+    if all_words:
+        # 設定中文字型路徑 (Streamlit Cloud 上可能預設不支援中文，這部分在雲端要另外處理字型檔)
+        # 本機測試可以直接跑
+        text = " ".join(all_words)
         
-        if all_keywords:
-            from collections import Counter
-            word_counts = Counter(all_keywords).most_common(20)
-            words_df = pd.DataFrame(word_counts, columns=['關鍵詞', '出現次數'])
-            fig_kw = px.bar(words_df, x='關鍵詞', y='出現次數', color='出現次數')
-            st.plotly_chart(fig_kw, use_container_width=True)
-        else:
-            st.warning("沒有提取到關鍵詞")
+        # 簡單做個文字雲
+        wc = WordCloud(font_path=None, width=800, height=400, background_color="white").generate(text)
+        
+        # 用 matplotlib 畫出來
+        fig, ax = plt.subplots()
+        ax.imshow(wc, interpolation='bilinear')
+        ax.axis("off")
+        st.pyplot(fig)
     else:
-        st.info("此區間無資料或缺少關鍵詞欄位")
+        st.info("無關鍵詞資料")
 
-# === Tab 4: 資料瀏覽 (之前沒東西就是這段有問題) ===
 with tab4:
-    st.header("詳細資料列表")
+    st.subheader("資料瀏覽")
     
-    # 這裡我們做一個切換開關，讓你可以看「篩選後」或「全部」資料
-    show_all = st.checkbox("顯示所有資料 (忽略日期篩選)")
-    
-    display_df = df if show_all else filtered_df
-    
-    if not display_df.empty:
-        # 只顯示重要欄位，避免表格太擠
-        cols_to_show = ['date_str', 'category', 'reporter', 'title', 'keywords', 'link']
-        
-        # 確保這些欄位真的存在，避免報錯
-        valid_cols = [c for c in cols_to_show if c in display_df.columns]
-        
-        st.dataframe(
-            display_df[valid_cols],
-            use_container_width=True,
-            hide_index=True,
-            height=600 # 設定高度，讓表格長一點
-        )
-    else:
-        st.warning("⚠️ 目前列表是空的，請嘗試調整左側日期區間，或勾選「顯示所有資料」。")
+    # 使用 dataframe 並設定 Link 欄位為按鈕格式
+    st.dataframe(
+        filtered_df[['date_str', 'category', 'reporter', 'title', 'link']],
+        column_config={
+            "link": st.column_config.LinkColumn("閱讀全文", display_text="點擊前往"),
+            "date_str": "發布時間",
+            "category": "分類",
+            "reporter": "記者",
+            "title": "標題"
+        },
+        use_container_width=True,
+        hide_index=True
+    )
