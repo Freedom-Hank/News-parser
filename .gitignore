@@ -3,3 +3,7 @@ serviceAccountKey.json
 
 # --- 編輯器設定檔 (VS Code) ---
 .vscode/
+
+# --- 忽略資料檔 ---
+ettoday_raw_data.csv
+cleaned_news.json
