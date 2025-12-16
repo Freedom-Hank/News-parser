@@ -15,7 +15,13 @@ if not firebase_admin._apps:
     # 1. 優先嘗試從 Streamlit Secrets 讀取 (雲端模式)
     if "firebase" in st.secrets:
         # 這裡的 "firebase" 對應到 Secrets 裡面的 [firebase]
-        key_dict = json.loads(st.secrets["firebase"]["credentials_json"])
+        key_dict = dict(st.secrets["firebase"])
+        
+        # 🔧 補救措施：處理 private_key 的換行符號
+        # 有時候 TOML 會把 \n 當成純文字，這裡把它變回真正的換行
+        if "\\n" in key_dict["private_key"]:
+            key_dict["private_key"] = key_dict["private_key"].replace("\\n", "\n")
+        
         cred = credentials.Certificate(key_dict)
     
     # 2. 如果沒有環境變數，則嘗試讀取本地檔案 (給你自己開發用)
@@ -23,9 +29,10 @@ if not firebase_admin._apps:
         cred = credentials.Certificate("serviceAccountKey.json")
     
     else:
-        raise FileNotFoundError("找不到 Firebase 金鑰！請設定環境變數或放入 json 檔。")
+        st.error("找不到 Firebase 金鑰！")
+        st.stop()
 
-    initialize_app(cred)
+    firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
