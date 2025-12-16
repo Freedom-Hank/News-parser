@@ -149,16 +149,34 @@ with tab3:
     all_words = []
     for k in filtered_df['keywords']:
         if isinstance(k, list): all_words.extend(k)
-    
+        
     if all_words:
-        # 設定中文字型路徑 (Streamlit Cloud 上可能預設不支援中文，這部分在雲端要另外處理字型檔)
-        # 本機測試可以直接跑
         text = " ".join(all_words)
         
-        # 簡單做個文字雲
-        wc = WordCloud(font_path=None, width=800, height=400, background_color="white").generate(text)
+        # --- 🔧 修改重點開始 ---
         
-        # 用 matplotlib 畫出來
+        # 設定字型檔名 (請確認你的檔案名稱跟這裡一模一樣)
+        font_path = "NotoSansTC-Regular.otf" 
+        
+        # 防呆機制：如果忘記上傳字型，改用預設 (雖然會變方塊，但至少不會報錯當機)
+        import os
+        if not os.path.exists(font_path):
+            st.warning("⚠️ 警告：找不到中文字型檔，文字雲可能顯示為方塊。請上傳 .otf/.ttf 檔案。")
+            use_font = None # 使用預設
+        else:
+            use_font = font_path
+
+        # 建立文字雲物件，並指定 font_path
+        wc = WordCloud(
+            font_path=use_font,  # <--- 關鍵！告訴它字型在哪裡
+            width=800, 
+            height=400, 
+            background_color="white"
+        ).generate(text)
+        
+        # --- 修改重點結束 ---
+
+        # 畫圖
         fig, ax = plt.subplots()
         ax.imshow(wc, interpolation='bilinear')
         ax.axis("off")
