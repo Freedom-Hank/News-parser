@@ -7,3 +7,5 @@ firebase-admin
 jieba
 streamlit
 plotly
+wordcloud
+matplotlib
