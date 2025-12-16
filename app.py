@@ -82,7 +82,8 @@ with st.sidebar:
         min_date = df['date_obj'].min().date()
         max_date = df['date_obj'].max().date()
         date_range = st.date_input("📅 選擇日期區間", [min_date, max_date])
-    
+   
+   #--------------------------------------------------- 
     # 2. 類別篩選 (多選)
     st.write("---") # 分隔線
     st.write("🏷️ 新聞類別篩選")
@@ -115,27 +116,48 @@ with st.sidebar:
         options=all_categories,
         key="selected_cats"
     )
-    ##--- 顯示目前篩選結果的指標卡 ---
-    # 1. 算出目前的篩選結果
+    
+    #--------------------------------------------------- 
+    # 3. 記者篩選
+    st.write("---")
+    st.write("🎤 記者篩選")
+    
+    # 取得所有記者名單 (排除沒名字的 Unknown 或是空值，看你想不想留)
+    all_reporters = sorted(df['reporter'].astype(str).unique())
+    
+    # 建立選單 (預設為空)
+    selected_reporters = st.multiselect(
+        "搜尋或選擇記者 (留空即顯示全部)：",
+        options=all_reporters,
+        default=[] # 預設空陣列，代表不篩選
+    )
+    
+    # --- 修正後的雙重過濾邏輯 ---
     if len(date_range) == 2:
         start_date, end_date = date_range
         
-        # 2. 雙重過濾邏輯： (符合類別) AND (符合日期範圍)
-        # 這裡的 & 符號代表「且」，兩者都要成立
-        filter_mask = (
+        # 基礎條件：日期 + 類別
+        condition = (
             (df['category'].isin(selected_cats)) & 
             (df['date_obj'].dt.date >= start_date) & 
             (df['date_obj'].dt.date <= end_date)
         )
         
-        current_count = df[filter_mask].shape[0]
+        # 疊加條件：如果有選記者，就多加這一條
+        if selected_reporters:
+            condition = condition & (df['reporter'].isin(selected_reporters))
+            
+        # 最終過濾
+        filter_mask = condition
+        filtered_df = df[filter_mask] # 算出最終資料表
+        current_count = filtered_df.shape[0]
         
     else:
-        # 如果使用者還在選日期 (只點了一下)，暫時顯示 0 或不計算
         current_count = 0
+        filtered_df = pd.DataFrame()
 
-    total_count = len(df)
-    # 3. 顯示美化的指標卡
+    #---------------------------------------------------
+    # 4. 顯示美化的指標卡
     st.sidebar.markdown("---") # 分隔線
     st.sidebar.metric(
         label="📊 資料筆數狀態",
@@ -177,7 +199,7 @@ with col4:
 st.markdown("---")
 
 # === 主內容分頁 ===
-tab1, tab2, tab3, tab4 = st.tabs(["📈 趨勢總覽", "🏆 記者戰力榜", "☁️ 關鍵詞雲", "🗃️ 詳細資料庫"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 趨勢總覽", "☁️ 關鍵詞雲", "🏆 記者戰力榜", "📊 記者戰力分析", "🗃️ 詳細資料庫"])
 
 with tab1:
     col_a, col_b = st.columns([2, 1])
@@ -195,16 +217,6 @@ with tab1:
         st.plotly_chart(fig_line, use_container_width=True)
 
 with tab2:
-    st.subheader("記者產量 Top 20")
-    reporter_counts = filtered_df['reporter'].value_counts().head(20).reset_index()
-    reporter_counts.columns = ['記者', '文章數']
-    reporter_counts = reporter_counts[reporter_counts['記者'] != 'Unknown']
-    
-    fig_bar = px.bar(reporter_counts, x='文章數', y='記者', orientation='h', color='文章數')
-    fig_bar.update_layout(yaxis={'categoryorder':'total ascending'}) # 讓長條圖由大排到小
-    st.plotly_chart(fig_bar, use_container_width=True)
-
-with tab3:
     st.subheader("熱門關鍵詞文字雲")
     # 這裡需要把所有 keywords 串接起來
     all_words = []
@@ -241,7 +253,47 @@ with tab3:
     else:
         st.info("無關鍵詞資料")
 
+with tab3:
+    st.subheader("記者產量 Top 20")
+    reporter_counts = filtered_df['reporter'].value_counts().head(20).reset_index()
+    reporter_counts.columns = ['記者', '文章數']
+    reporter_counts = reporter_counts[reporter_counts['記者'] != 'Unknown']
+    
+    fig_bar = px.bar(reporter_counts, x='文章數', y='記者', orientation='h', color='文章數')
+    fig_bar.update_layout(yaxis={'categoryorder':'total ascending'}) # 讓長條圖由大排到小
+    st.plotly_chart(fig_bar, use_container_width=True)
+
 with tab4:
+    if selected_reporters:
+        st.markdown("---")
+        st.subheader(f"📊 記者發稿領域分析 ({len(selected_reporters)} 位)")
+        
+        # 1. 準備畫圖資料：計算每個類別有幾篇
+        # GroupBy: 記者 + 類別 -> 計算篇數
+        reporter_stats = filtered_df.groupby(['reporter', 'category']).size().reset_index(name='count')
+        
+        # 2. 使用 Plotly 畫堆疊長條圖
+        import plotly.express as px
+        
+        fig_reporter = px.bar(
+            reporter_stats,
+            x="reporter",       # X軸：記者名字
+            y="count",          # Y軸：文章數量
+            color="category",   # 顏色：新聞類別 (這樣一眼就能看出成分)
+            title="記者發稿類別分布圖",
+            text="count",       # 在柱狀圖上顯示數字
+            labels={"reporter": "記者", "count": "文章篇數", "category": "新聞類別"}
+        )
+        
+        st.plotly_chart(fig_reporter, use_container_width=True)
+        st.markdown("### 記者發稿數據表")
+        st.dataframe(reporter_stats)
+
+    else:
+        # 如果沒選記者，就不特別顯示這個圖表，或是顯示全站的類別分布
+        pass
+
+with tab5:
     st.subheader("資料瀏覽")
     
     # 使用 dataframe 並設定 Link 欄位為按鈕格式
