@@ -205,7 +205,7 @@ with col4:
 st.markdown("---")
 
 # === 主內容分頁 ===
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 趨勢總覽", "☁️ 關鍵詞雲", "🏆 記者戰力榜", "📊 記者戰力分析", "🗃️ 詳細資料庫"])
+tab1, tab2, tab3, tab4 = st.tabs(["📈 趨勢總覽", "☁️ 關鍵詞雲", "🏆 記者戰力榜", "📊 戰力分析與資料庫"])
 
 with tab1:
     col_a, col_b = st.columns([2, 1])
@@ -272,82 +272,36 @@ with tab3:
 with tab4:
     # 如果使用者有選記者，才顯示詳細分析
     if selected_reporters:
-        names = "、".join(selected_reporters)
-        st.subheader(f"📰 記者專屬分析：{names}")
+        st.subheader(f"📊 記者戰力分析：{'、'.join(selected_reporters)}")
         
-        if filtered_df.empty:
-            st.warning("⚠️ 在此篩選條件下（日期/類別），找不到這位記者的文章！")
-        else:
-            # 建立三個子分頁，讓資訊不擁擠
-            sub_tab1, sub_tab2, sub_tab3 = st.tabs(["📊 領域與戰力", "📈 發文時間軸", "📝 詳細文章列表"])
+        if not filtered_df.empty:
+            sub_t1, sub_t2 = st.tabs(["📊 領域分布", "📈 發文趨勢"])
+            
+            with sub_t1:
+                reporter_stats = filtered_df.groupby(['reporter', 'category']).size().reset_index(name='count')
+                fig_cat = px.bar(
+                    reporter_stats, x="reporter", y="count", color="category",
+                    title="發稿領域分布", text="count",
+                    labels={"reporter": "記者", "count": "篇數", "category": "類別"}
+                )
+                st.plotly_chart(fig_cat, use_container_width=True)
 
-            # --- 子分頁 1: 領域分析 ---
-            with sub_tab1:
-                col1, col2 = st.columns([1, 2])
-                with col1:
-                    # 顯示關鍵數據
-                    total_articles = len(filtered_df)
-                    st.metric("在此期間總發文", f"{total_articles} 篇")
-                    
-                    # 算出主攻領域
-                    top_cat = filtered_df['category'].mode()[0]
-                    st.metric("主攻領域", top_cat)
-
-                with col2:
-                    # 記者發稿領域分布圖
-                    reporter_stats = filtered_df.groupby(['reporter', 'category']).size().reset_index(name='count')
-                    fig_cat = px.bar(
-                        reporter_stats,
-                        x="reporter",
-                        y="count",
-                        color="category",
-                        title="發稿領域分布",
-                        text="count",
-                        labels={"reporter": "記者", "count": "篇數", "category": "類別"}
-                    )
-                    st.plotly_chart(fig_cat, use_container_width=True)
-
-            # --- 子分頁 2: 每日趨勢 ---
-            with sub_tab2:
-                st.subheader("📅 每日發文量趨勢")
-                # 依「日期」和「記者」分組計算
+            with sub_t2:
                 daily_stats = filtered_df.groupby([filtered_df['date_obj'].dt.date, 'reporter']).size().reset_index(name='count')
                 daily_stats.columns = ['date', 'reporter', 'count']
-                
                 fig_trend = px.line(
-                    daily_stats,
-                    x='date',
-                    y='count',
-                    color='reporter',
-                    markers=True,
+                    daily_stats, x='date', y='count', color='reporter', markers=True,
                     title="每日發文數量走勢",
-                    labels={"date": "日期", "count": "發文篇數", "reporter": "記者"}
+                    labels={"date": "日期", "count": "篇數", "reporter": "記者"}
                 )
                 st.plotly_chart(fig_trend, use_container_width=True)
+            
+            st.markdown("---")
+        else:
+            st.warning("⚠️ 該記者在此篩選條件下無發文紀錄。")
 
-            # --- 子分頁 3: 詳細列表 ---
-            with sub_tab3:
-                st.subheader("📝 文章列表")
-                st.dataframe(
-                    filtered_df[['date_str', 'category', 'reporter', 'title', 'link']],
-                    column_config={
-                        "link": st.column_config.LinkColumn("連結", display_text="前往"),
-                        "date_str": "時間",
-                        "category": "類別",
-                        "title": "標題"
-                    },
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-    else:
-        # 如果沒選記者，顯示提示
-        st.info("👈 請在左側側邊欄選擇一位或多位記者，以查看詳細戰力分析。")
-
-with tab5:
-    st.subheader("資料瀏覽")
+    st.subheader(f"📝 詳細文章列表 (共 {len(filtered_df)} 筆)")
     
-    # 使用 dataframe 並設定 Link 欄位為按鈕格式
     st.dataframe(
         filtered_df[['date_str', 'category', 'reporter', 'title', 'link']],
         column_config={
