@@ -84,10 +84,66 @@ with st.sidebar:
         date_range = st.date_input("📅 選擇日期區間", [min_date, max_date])
     
     # 2. 類別篩選 (多選)
-    all_categories = sorted(df['category'].unique())
-    selected_cats = st.multiselect("🏷️ 選擇新聞類別", all_categories, default=all_categories)
+    st.write("---") # 分隔線
+    st.write("🏷️ 新聞類別篩選")
     
-    st.info(f"資料來源：ETtoday\n總筆數：{len(df)} 筆")
+    # 取得所有類別
+    all_categories = sorted(df['category'].unique())
+    
+    # === 關鍵：使用 session_state 來記住現在選了什麼 ===
+    # 初始化：如果還沒存過，預設全選
+    if "selected_cats" not in st.session_state:
+        st.session_state["selected_cats"] = all_categories
+
+    # 定義按鈕的回呼函式 (Callback)
+    def select_all():
+        st.session_state["selected_cats"] = all_categories
+
+    def deselect_all():
+        st.session_state["selected_cats"] = [] # 清空列表
+
+    # 建立兩顆按鈕並排
+    col1, col2 = st.columns(2)
+    with col1:
+        st.button("✅ 全選", on_click=select_all, use_container_width=True)
+    with col2:
+        st.button("❌ 清空", on_click=deselect_all, use_container_width=True)
+
+    # 顯示選單 (重點：key 要設對，才會跟上面的按鈕連動)
+    selected_cats = st.multiselect(
+        "請選擇類別：",
+        options=all_categories,
+        key="selected_cats"
+    )
+    ##--- 顯示目前篩選結果的指標卡 ---
+    # 1. 算出目前的篩選結果
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+        
+        # 2. 雙重過濾邏輯： (符合類別) AND (符合日期範圍)
+        # 這裡的 & 符號代表「且」，兩者都要成立
+        filter_mask = (
+            (df['category'].isin(selected_cats)) & 
+            (df['date_obj'].dt.date >= start_date) & 
+            (df['date_obj'].dt.date <= end_date)
+        )
+        
+        current_count = df[filter_mask].shape[0]
+        
+    else:
+        # 如果使用者還在選日期 (只點了一下)，暫時顯示 0 或不計算
+        current_count = 0
+
+    total_count = len(df)
+    # 3. 顯示美化的指標卡
+    st.sidebar.markdown("---") # 分隔線
+    st.sidebar.metric(
+        label="📊 資料筆數狀態",
+        value=f"{current_count} 筆",
+        delta=f"總資料庫: {total_count} 筆",
+        delta_color="off"
+    )
+    st.sidebar.caption(f"資料來源：ETtoday")
 
 # === 資料過濾邏輯 ===
 # 根據使用者的篩選條件產生 filtered_df
@@ -158,8 +214,6 @@ with tab3:
     if all_words:
         text = " ".join(all_words)
         
-        # --- 🔧 修改重點開始 ---
-        
         # 設定字型檔名
         font_path = "NotoSansTC-VariableFont_wght.ttf" 
         
@@ -173,13 +227,11 @@ with tab3:
 
         # 建立文字雲物件，並指定 font_path
         wc = WordCloud(
-            font_path=use_font,  # <--- 關鍵！告訴它字型在哪裡
+            font_path=use_font,
             width=800, 
             height=400, 
             background_color="white"
         ).generate(text)
-        
-        # --- 修改重點結束 ---
 
         # 畫圖
         fig, ax = plt.subplots()
