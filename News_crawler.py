@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import time
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 import urllib3
 
@@ -16,9 +16,20 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- 設定區 ---
-START_DATE = "2025-11-12" 
-DAYS_TO_CRAWL = 12  # 先設 2 天試跑，確認 OK 後再改
+# 1. 設定台灣時區 (UTC+8)
+# 這樣無論你的程式在美國主機還是在哪裡跑，永遠都是抓台灣的「今天」
+tw_timezone = timezone(timedelta(hours=8))
+today_in_taiwan = datetime.now(tw_timezone)
+
+# 2. 轉成文字格式 "2025-12-16"
+START_DATE = today_in_taiwan.strftime("%Y-%m-%d")
+
+# 3. 每次只抓當天 (因為你每 6 小時就會跑一次來更新)
+DAYS_TO_CRAWL = 1 
+
 OUTPUT_FILE = "ettoday_raw_data.csv"
+
+print(f"🤖 自動化啟動：目標日期為 {START_DATE} (台灣時間)")
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
