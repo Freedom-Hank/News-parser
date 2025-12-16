@@ -155,8 +155,8 @@ with tab3:
         
         # --- 🔧 修改重點開始 ---
         
-        # 設定字型檔名 (請確認你的檔案名稱跟這裡一模一樣)
-        font_path = "NotoSansTC-Regular.otf" 
+        # 設定字型檔名
+        font_path = "NotoSansTC-VariableFont_wght.ttf" 
         
         # 防呆機制：如果忘記上傳字型，改用預設 (雖然會變方塊，但至少不會報錯當機)
         import os
