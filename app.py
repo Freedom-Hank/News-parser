@@ -16,7 +16,7 @@ if not firebase_admin._apps:
     if "firebase" in st.secrets:
         # 這裡的 "firebase" 對應到 Secrets 裡面的 [firebase]
         key_dict = json.loads(st.secrets["firebase"]["credentials_json"])
-        cred = credentials.Certificate(key_dict))
+        cred = credentials.Certificate(key_dict)
     
     # 2. 如果沒有環境變數，則嘗試讀取本地檔案 (給你自己開發用)
     elif os.path.exists("serviceAccountKey.json"):
