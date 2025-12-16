@@ -104,7 +104,12 @@ with col1:
     st.metric("總文章數", f"{len(filtered_df)} 篇")
 with col2:
     # 算出最活躍記者
-    top_reporter = filtered_df['reporter'].mode()[0] if not filtered_df.empty else "N/A"
+    valid_reporters = filtered_df[filtered_df['reporter'] != 'Unknown']
+
+    if not valid_reporters.empty:
+        top_reporter = valid_reporters['reporter'].mode()[0]
+    else:
+        top_reporter = "N/A"
     st.metric("🔥 最活躍記者", top_reporter)
 with col3:
     st.metric("涵蓋類別數", f"{filtered_df['category'].nunique()} 類")
