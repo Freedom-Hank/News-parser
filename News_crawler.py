@@ -16,8 +16,8 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- 設定區 ---
-START_DATE = "2025-12-15" 
-DAYS_TO_CRAWL = 1  # 先設 2 天試跑，確認 OK 後再改成 20
+START_DATE = "2025-11-12" 
+DAYS_TO_CRAWL = 12  # 先設 2 天試跑，確認 OK 後再改
 OUTPUT_FILE = "ettoday_raw_data.csv"
 
 HEADERS = {
@@ -33,7 +33,7 @@ def get_news_links_by_date(date_str):
     
     chrome_options = Options()
     chrome_options.add_argument("--disable-gpu")
-    # chrome_options.add_argument("--headless") 
+    chrome_options.add_argument("--headless") 
 
     html_source = "" # 1. 先宣告這個變數
 
