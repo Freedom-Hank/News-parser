@@ -4,6 +4,7 @@ from firebase_admin import credentials, firestore, initialize_app
 import pandas as pd
 import plotly.express as px
 import os
+import json
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 
@@ -11,13 +12,11 @@ import matplotlib.pyplot as plt
 # --- 1. 初始化 Firebase (只執行一次) ---
 # Streamlit 會在每次互動時重跑整個腳本，所以要檢查是否已經初始化
 if not firebase_admin._apps:
-    # 1. 優先嘗試讀取環境變數 (給 GitHub Actions 用)
-    firebase_key_env = os.environ.get("FIREBASE_CREDENTIALS")
-    
-    if firebase_key_env:
-        # 如果環境變數存在，將 JSON 字串轉回 Dict
-        cred_dict = json.loads(firebase_key_env)
-        cred = credentials.Certificate(cred_dict)
+    # 1. 優先嘗試從 Streamlit Secrets 讀取 (雲端模式)
+    if "firebase" in st.secrets:
+        # 這裡的 "firebase" 對應到 Secrets 裡面的 [firebase]
+        key_dict = json.loads(st.secrets["firebase"]["credentials_json"])
+        cred = credentials.Certificate(key_dict))
     
     # 2. 如果沒有環境變數，則嘗試讀取本地檔案 (給你自己開發用)
     elif os.path.exists("serviceAccountKey.json"):
