@@ -156,6 +156,9 @@ with st.sidebar:
         current_count = 0
         filtered_df = pd.DataFrame()
 
+    # 計算總資料筆數
+    total_count = df.shape[0]
+
     #---------------------------------------------------
     # 4. 顯示美化的指標卡
     st.sidebar.markdown("---") # 分隔線
