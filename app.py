@@ -87,12 +87,6 @@ st.set_page_config(
 st.title("📰 ETtoday 新聞輿情戰情室")
 st.markdown("---")
 
-# 載入資料
-df = load_data(start_date, end_date)
-if df.empty:
-    st.warning(f"⚠️ 在 {start_date} 到 {end_date} 之間找不到新聞資料。")
-    st.stop()
-
 # === 側邊欄：全域控制中心 ===
 with st.sidebar:
     st.header("⚙️ 篩選控制")
@@ -209,6 +203,12 @@ with st.sidebar:
         delta_color="off"
     )
     st.sidebar.caption(f"資料來源：ETtoday")
+
+# 載入資料
+df = load_data(start_date, end_date)
+if df.empty:
+    st.warning(f"⚠️ 在 {start_date} 到 {end_date} 之間找不到新聞資料。")
+    st.stop()
 
 # === 資料過濾邏輯 ===
 # 根據使用者的篩選條件產生 filtered_df
