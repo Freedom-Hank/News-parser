@@ -87,131 +87,110 @@ st.set_page_config(
 st.title("📰 ETtoday 新聞輿情戰情室")
 st.markdown("---")
 
-# === 側邊欄：全域控制中心 ===
+# ==========================================
+# 1. 側邊欄 Part A：日期選擇
+# ==========================================
 with st.sidebar:
     st.header("⚙️ 篩選控制")
     
-    # 1. 日期篩選
-    # 設定預設值：預設看最近 3 天
+    # 設定預設值
     default_start = datetime.now().date() - timedelta(days=3)
     default_end = datetime.now().date()
 
     # 日期選擇器
     date_range = st.date_input(
         "📅 選擇資料日期區間 (建議範圍勿過大)", 
-        (default_start, default_end), # 預設值
-        max_value=datetime.now().date() # 不能選未來
+        (default_start, default_end), 
+        max_value=datetime.now().date()
     )
 
     if len(date_range) == 2:
         start_date, end_date = date_range
         
-        # 顯示一個警告，提醒使用者選太多天會跑很久
         days_diff = (end_date - start_date).days
         if days_diff > 7:
-            st.warning(f"⚠️ 您選擇了 {days_diff} 天的資料，讀取可能會花一點時間（且會增加資料庫讀取成本）。")
-            
-        # 重新載入按鈕
-        need_reload = st.button("🔄 載入資料", use_container_width=True, type="primary")
+            st.warning(f"⚠️ 您選擇了 {days_diff} 天，讀取會花一點時間。")
     else:
         st.info("請選擇結束日期")
-        st.stop()
-   
-   #--------------------------------------------------- 
-    # 2. 類別篩選 (多選)
-    st.write("---") # 分隔線
+        st.stop() # 這裡停住，等待使用者選完日期
+
+# ==========================================
+# 2. 核心動作：載入資料
+# ==========================================
+# 程式跑到這裡，已經有 start_date 跟 end_date 了，可以去抓資料了
+df = load_data(start_date, end_date)
+
+# 防呆：如果 df 是空的，顯示訊息並停止
+if df.empty:
+    st.warning(f"⚠️ 在 {start_date} 到 {end_date} 之間找不到新聞資料。")
+    st.stop()
+
+# ==========================================
+# 3. 側邊欄 Part B：類別與記者篩選
+# ==========================================
+with st.sidebar:
+    # --- 類別篩選 ---
+    st.write("---")
     st.write("🏷️ 新聞類別篩選")
     
-    # 取得所有類別
     all_categories = sorted(df['category'].unique())
     
-    # === 關鍵：使用 session_state 來記住現在選了什麼 ===
-    # 初始化：如果還沒存過，預設全選
     if "selected_cats" not in st.session_state:
         st.session_state["selected_cats"] = all_categories
 
-    # 定義按鈕的回呼函式 (Callback)
     def select_all():
         st.session_state["selected_cats"] = all_categories
 
     def deselect_all():
-        st.session_state["selected_cats"] = [] # 清空列表
+        st.session_state["selected_cats"] = []
 
-    # 建立兩顆按鈕並排
     col1, col2 = st.columns(2)
     with col1:
         st.button("✅ 全選", on_click=select_all, use_container_width=True)
     with col2:
         st.button("❌ 清空", on_click=deselect_all, use_container_width=True)
 
-    # 顯示選單 (重點：key 要設對，才會跟上面的按鈕連動)
     selected_cats = st.multiselect(
         "請選擇類別：",
         options=all_categories,
         key="selected_cats"
     )
     
-    #--------------------------------------------------- 
-    # 3. 記者篩選
+    # --- 記者篩選 ---
     st.write("---")
     st.write("🎤 記者篩選")
     
-    # 取得所有記者名單 (排除沒名字的 Unknown 或是空值，看你想不想留)
     all_reporters = sorted(df['reporter'].astype(str).unique())
     
-    # 建立選單 (預設為空)
     selected_reporters = st.multiselect(
         "搜尋或選擇記者 (留空即顯示全部)：",
         options=all_reporters,
-        default=[] # 預設空陣列，代表不篩選
+        default=[]
     )
     
-    # --- 修正後的雙重過濾邏輯 ---
-    if len(date_range) == 2:
-        start_date, end_date = date_range
-        
-        # 基礎條件：日期 + 類別
-        condition = (
-            (df['category'].isin(selected_cats)) & 
-            (df['date_obj'].dt.date >= start_date) & 
-            (df['date_obj'].dt.date <= end_date)
-        )
-        
-        # 疊加條件：如果有選記者，就多加這一條
-        if selected_reporters:
-            condition = condition & (df['reporter'].isin(selected_reporters))
+    # --- 計算過濾後的結果 (給 Metric 使用) ---
+    # 這裡只做簡單計算給側邊欄看，真正的過濾邏輯在主畫面也會用到
+    mask = df['category'].isin(selected_cats)
+    
+    if selected_reporters:
+        mask = mask & (df['reporter'].isin(selected_reporters))
             
-        # 最終過濾
-        filter_mask = condition
-        filtered_df = df[filter_mask] # 算出最終資料表
-        current_count = filtered_df.shape[0]
-        
-    else:
-        current_count = 0
-        filtered_df = pd.DataFrame()
-
-    # 計算總資料筆數
+    filtered_count = df[mask].shape[0]
     total_count = df.shape[0]
 
-    #---------------------------------------------------
-    # 4. 顯示美化的指標卡
-    st.sidebar.markdown("---") # 分隔線
-    st.sidebar.metric(
+    # --- 顯示指標卡 ---
+    st.markdown("---")
+    st.metric(
         label="📊 資料筆數狀態",
-        value=f"{current_count} 筆",
-        delta=f"總資料庫: {total_count} 筆",
+        value=f"{filtered_count} 筆",
+        delta=f"本區間總庫存: {total_count} 筆",
         delta_color="off"
     )
-    st.sidebar.caption(f"資料來源：ETtoday")
+    st.caption(f"資料來源：ETtoday")
 
-# 載入資料
-df = load_data(start_date, end_date)
-if df.empty:
-    st.warning(f"⚠️ 在 {start_date} 到 {end_date} 之間找不到新聞資料。")
-    st.stop()
-
-# === 資料過濾邏輯 ===
-# 根據使用者的篩選條件產生 filtered_df
+# ==========================================
+# 4. 主畫面資料過濾 (產生全域 filtered_df 給圖表用)
+# ==========================================
 mask = df['category'].isin(selected_cats)
 
 if selected_reporters:
