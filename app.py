@@ -67,8 +67,7 @@ def load_data(start_date, end_date):
         return df
         
     except Exception as e:
-        st.error(f"資料讀取錯誤: {e}")
-        # 如果是索引問題，這裡通常會噴錯，下面會解釋
+        st.error(f"資料讀取錯誤: {e}")  
         return pd.DataFrame()
 
 # --- 3. 介面開始 ---
@@ -84,7 +83,7 @@ st.title("📰 ETtoday 新聞輿情戰情室")
 st.markdown("---")
 
 # 載入資料
-df = load_data()
+df = load_data(start_date, end_date)
 if df.empty:
     st.warning(f"⚠️ 在 {start_date} 到 {end_date} 之間找不到新聞資料。")
     st.stop()
@@ -100,7 +99,7 @@ with st.sidebar:
 
     # 日期選擇器
     date_range = st.date_input(
-        "📅 選擇資料日期區間", 
+        "📅 選擇資料日期區間 (建議範圍勿過大)", 
         (default_start, default_end), # 預設值
         max_value=datetime.now().date() # 不能選未來
     )
