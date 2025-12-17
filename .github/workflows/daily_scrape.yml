@@ -33,8 +33,10 @@ jobs:
       - name: Run Cleaner (執行清洗)
         run: python News_cleaner.py
 
-      - name: Run Uploader (上傳 Firebase)
+      - name: Create Firebase Key File (產生金鑰檔案)
         env:
-          # 把 GitHub Secret 注入到環境變數，讓 Python 讀得到
           FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
-        run: python news_uploader.py
+        run: echo "$FIREBASE_CREDENTIALS" > serviceAccountKey.json
+
+      - name: Run Uploader (上傳 Firebase)
+        run: python News_uploader.py
