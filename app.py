@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.express as px
 import os
 import json
+from datetime import datetime, timedelta
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 
@@ -39,21 +40,36 @@ db = firestore.client()
 # --- 2. 資料讀取與快取 (Cache) ---
 # 使用 @st.cache_data 避免每次按按鈕都重新去 Firebase 撈資料 (省流量、加速)
 @st.cache_data(ttl=600) # 設定 10 分鐘過期
-def load_data():
-    docs = db.collection("news").stream()
-    data = []
-    for doc in docs:
-        data.append(doc.to_dict())
-    
-    if not data:
-        return pd.DataFrame()
+def load_data(start_date, end_date):
+    """
+    根據使用者選擇的日期區間，去 Firestore 抓資料
+    """
 
-    df = pd.DataFrame(data)
-    
-    # 確保日期欄位是 datetime 格式，方便篩選
-    # 假設你的日期格式是 "2024-03-20 12:00" 或 "2024-03-20"
-    df['date_obj'] = pd.to_datetime(df['date_str'], errors='coerce')
-    return df
+    start_str = start_date.strftime("%Y-%m-%d")
+    end_str = end_date.strftime("%Y-%m-%d")
+    try:
+        docs = (
+            db.collection("news")
+            .where("date_str", ">=", start_str)
+            .where("date_str", "<=", end_str)
+            .stream()
+        )
+        
+        data = []
+        for doc in docs:
+            data.append(doc.to_dict())
+        
+        if not data:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(data)
+        df['date_obj'] = pd.to_datetime(df['date_str'], errors='coerce')
+        return df
+        
+    except Exception as e:
+        st.error(f"資料讀取錯誤: {e}")
+        # 如果是索引問題，這裡通常會噴錯，下面會解釋
+        return pd.DataFrame()
 
 # --- 3. 介面開始 ---
 st.set_page_config(
@@ -70,7 +86,7 @@ st.markdown("---")
 # 載入資料
 df = load_data()
 if df.empty:
-    st.warning("目前沒有資料，請確認資料庫狀態。")
+    st.warning(f"⚠️ 在 {start_date} 到 {end_date} 之間找不到新聞資料。")
     st.stop()
 
 # === 側邊欄：全域控制中心 ===
@@ -78,10 +94,30 @@ with st.sidebar:
     st.header("⚙️ 篩選控制")
     
     # 1. 日期篩選
-    if 'date_obj' in df.columns:
-        min_date = df['date_obj'].min().date()
-        max_date = df['date_obj'].max().date()
-        date_range = st.date_input("📅 選擇日期區間", [min_date, max_date])
+    # 設定預設值：預設看最近 3 天
+    default_start = datetime.now().date() - timedelta(days=3)
+    default_end = datetime.now().date()
+
+    # 日期選擇器
+    date_range = st.date_input(
+        "📅 選擇資料日期區間", 
+        (default_start, default_end), # 預設值
+        max_value=datetime.now().date() # 不能選未來
+    )
+
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+        
+        # 顯示一個警告，提醒使用者選太多天會跑很久
+        days_diff = (end_date - start_date).days
+        if days_diff > 7:
+            st.warning(f"⚠️ 您選擇了 {days_diff} 天的資料，讀取可能會花一點時間（且會增加資料庫讀取成本）。")
+            
+        # 重新載入按鈕
+        need_reload = st.button("🔄 載入資料", use_container_width=True, type="primary")
+    else:
+        st.info("請選擇結束日期")
+        st.stop()
    
    #--------------------------------------------------- 
     # 2. 類別篩選 (多選)
@@ -173,8 +209,6 @@ with st.sidebar:
 # === 資料過濾邏輯 ===
 # 根據使用者的篩選條件產生 filtered_df
 mask = df['category'].isin(selected_cats)
-if len(date_range) == 2:
-    mask = mask & (df['date_obj'].dt.date >= date_range[0]) & (df['date_obj'].dt.date <= date_range[1])
 
 if selected_reporters:
     mask = mask & (df['reporter'].isin(selected_reporters))
