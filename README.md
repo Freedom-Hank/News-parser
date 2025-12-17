@@ -3,8 +3,10 @@
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-App-red)](https://streamlit.io/)
 [![Firebase](https://img.shields.io/badge/Database-Firestore-orange)](https://firebase.google.com/)
+![GitHub Actions](https://img.shields.io/badge/Automation-Daily%20Scrape-green)
 
-這是一個全自動化的新聞輿情分析系統，專門針對 ETtoday 新聞雲進行數據採集。系統結合了 Selenium 自動化爬蟲、自然語言處理 (NLP) 關鍵詞提取、雲端資料庫儲存，並透過 Streamlit 打造互動式儀表板，提供即時的數據視覺化分析。
+這是一個全自動化的新聞輿情分析系統，專門針對 **ETtoday 新聞雲** 進行資料蒐集與分析。
+透過 GitHub Actions 實現每日自動爬蟲，並結合 Firebase Firestore 與 Streamlit 打造即時互動儀表板，提供記者戰力分析、熱門關鍵詞雲與發文趨勢觀察。
 
 ## 🚀 功能特色
 
@@ -24,6 +26,8 @@
     * **多維度篩選**：支援依日期、類別進行資料過濾。
 * **CI/CD 自動化**：
     * 整合 GitHub Actions，每日定時自動執行爬蟲與資料更新。
+    * 自動執行「爬取 -> 清洗 -> 去重 -> 上傳」流程，無需人工介入。
+    * 實作 Secrets 管理，確保雲端金鑰安全。
 
 ## 🛠️ 系統架構
 
@@ -36,6 +40,18 @@ graph LR
     F[User] -->|訪問| G[Streamlit Dashboard]
     G <-->|讀取數據| E
 ```
+## 📂 檔案結構說明
+
+| 檔名 | 類別 | 說明 |
+| :--- | :--- | :--- |
+| `app.py` | 應用程式 | Streamlit 戰情室主程式，負責前端介面與資料視覺化 |
+| `News_crawler.py` | 資料管線 | 爬蟲核心，負責從新聞網站抓取原始 HTML 資料 |
+| `news_cleaner.py` | 資料管線 | 負責資料清洗、欄位標準化 (ETL Process) |
+| `news_uploader.py` | 資料管線 | 負責產生去重 ID 並將資料上傳至 Firestore |
+| `check_count.py` | 維運工具 | **成本優化工具**，利用 Aggregation Query 快速查詢資料庫總筆數 (不消耗大量讀取額度) |
+| `.github/workflows/` | 自動化 | GitHub Actions CI/CD 自動化腳本設定檔 |
+| `requirements.txt` | 設定檔 | 專案相依套件列表 |
+
 ## 💻 安裝與執行 (Local Development)
 1. 複製專案
 ```
@@ -52,13 +68,13 @@ pip install -r requirements.txt
 注意：請勿將此金鑰上傳至 GitHub (已加入 .gitignore)
 4.  執行流程
 ```
-# 1. 抓取新聞 (預設抓取 1 天)
+1. 抓取新聞 (預設抓取 1 天)
 python News_crawler.py
 
-# 2. 清洗資料
+2. 清洗資料
 python news_cleaner.py
 
-# 3. 上傳至 Firebase
+3. 上傳至 Firebase
 python news_uploader.py
 ```
 5.  啟動儀表板
