@@ -46,8 +46,8 @@ def load_data(start_date, end_date):
     """
     # 確保日期是 datetime.date 類型，並轉成字串
     try:
-        start_str = start_date.strftime("%Y-%m-%d")
-        end_str = end_date.strftime("%Y-%m-%d")
+        start_str = start_date.strftime("%Y/%m/%d")
+        end_str = end_date.strftime("%Y/%m/%d")
     except AttributeError:
         # 如果傳進來的不是日期物件 (例如是 None 或 Tuple)，這裡會抓到錯誤
         return pd.DataFrame()
@@ -117,7 +117,6 @@ with st.sidebar:
 # ==========================================
 # 2. 核心動作：載入資料
 # ==========================================
-# 程式跑到這裡，已經有 start_date 跟 end_date 了，可以去抓資料了
 df = load_data(start_date, end_date)
 
 # 防呆：如果 df 是空的，顯示訊息並停止
