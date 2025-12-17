@@ -39,14 +39,19 @@ db = firestore.client()
 
 # --- 2. 資料讀取與快取 (Cache) ---
 # 使用 @st.cache_data 避免每次按按鈕都重新去 Firebase 撈資料 (省流量、加速)
-@st.cache_data(ttl=600) # 設定 10 分鐘過期
+@st.cache_data(ttl=600) 
 def load_data(start_date, end_date):
     """
-    根據使用者選擇的日期區間，去 Firestore 抓資料
+    根據使用者選擇的日期區間，去 Firebase 抓取資料。
     """
+    # 確保日期是 datetime.date 類型，並轉成字串
+    try:
+        start_str = start_date.strftime("%Y-%m-%d")
+        end_str = end_date.strftime("%Y-%m-%d")
+    except AttributeError:
+        # 如果傳進來的不是日期物件 (例如是 None 或 Tuple)，這裡會抓到錯誤
+        return pd.DataFrame()
 
-    start_str = start_date.strftime("%Y-%m-%d")
-    end_str = end_date.strftime("%Y-%m-%d")
     try:
         docs = (
             db.collection("news")
@@ -65,9 +70,9 @@ def load_data(start_date, end_date):
         df = pd.DataFrame(data)
         df['date_obj'] = pd.to_datetime(df['date_str'], errors='coerce')
         return df
-        
+
     except Exception as e:
-        st.error(f"資料讀取錯誤: {e}")  
+        st.error(f"資料讀取錯誤: {e}")
         return pd.DataFrame()
 
 # --- 3. 介面開始 ---
