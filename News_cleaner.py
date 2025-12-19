@@ -79,8 +79,7 @@ def extract_reporter(content):
             if len(name) < 2 or len(name) > 10:
                 continue
 
-            # 3. 黑名單檢查 (只要名字裡包含 "提供" 或 "翻攝" 就丟掉)
-            # 例如: "民眾提供" -> 包含 "提供" -> 丟掉
+            # 3. 黑名單檢查 ：過濾掉常見的非人名詞
             if any(blk in name for blk in REPORTER_BLACKLIST):
                 continue
 

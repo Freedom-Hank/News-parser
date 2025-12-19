@@ -12,19 +12,18 @@ from datetime import datetime, timedelta, timezone
 import os
 import urllib3
 
-# 1. 關閉 SSL 安全憑證警告 (關鍵修正)
+# 1. 關閉 SSL 安全憑證警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- 設定區 ---
 # 1. 設定台灣時區 (UTC+8)
-# 這樣無論你的程式在美國主機還是在哪裡跑，永遠都是抓台灣的「今天」
 tw_timezone = timezone(timedelta(hours=8))
 today_in_taiwan = datetime.now(tw_timezone)
 
 # 2. 轉成文字格式 "2025-12-16"
 START_DATE = today_in_taiwan.strftime("%Y-%m-%d")
 
-# 3. 每次只抓當天 (因為你每 6 小時就會跑一次來更新)
+# 3. 每次只抓當天
 DAYS_TO_CRAWL = 1 
 
 OUTPUT_FILE = "ettoday_raw_data.csv"
@@ -46,7 +45,7 @@ def get_news_links_by_date(date_str):
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--headless") 
 
-    html_source = "" # 1. 先宣告這個變數
+    html_source = ""
 
     try:
         driver = webdriver.Chrome(
@@ -109,7 +108,6 @@ def get_news_links_by_date(date_str):
         
     # --- 解析 HTML ---
     
-    # 3. 絕對不要再呼叫 driver.page_source，直接用上面存好的 html_source
     if not html_source:
         print("❌ 未取得網頁原始碼，跳過解析。")
         return []

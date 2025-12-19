@@ -18,8 +18,6 @@ if not firebase_admin._apps:
         # 這裡的 "firebase" 對應到 Secrets 裡面的 [firebase]
         key_dict = dict(st.secrets["firebase"])
         
-        # 🔧 補救措施：處理 private_key 的換行符號
-        # 有時候 TOML 會把 \n 當成純文字，這裡把它變回真正的換行
         if "\\n" in key_dict["private_key"]:
             key_dict["private_key"] = key_dict["private_key"].replace("\\n", "\n")
         
@@ -79,7 +77,7 @@ def load_data(start_date, end_date):
 st.set_page_config(
     page_title="ETtoday 新聞輿情戰情室",
     page_icon="📰",
-    layout="wide", # 寬螢幕模式
+    layout="wide",
     initial_sidebar_state="expanded"
 )
 
@@ -168,7 +166,6 @@ with st.sidebar:
     )
     
     # --- 計算過濾後的結果 (給 Metric 使用) ---
-    # 這裡只做簡單計算給側邊欄看，真正的過濾邏輯在主畫面也會用到
     mask = df['category'].isin(selected_cats)
     
     if selected_reporters:
@@ -198,7 +195,6 @@ if selected_reporters:
 filtered_df = df[mask]
 
 # === 關鍵指標區 (KPI Metrics) ===
-# 用三欄排版顯示大數字
 col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.metric("總文章數", f"{len(filtered_df)} 篇")
@@ -214,8 +210,6 @@ with col2:
 with col3:
     st.metric("涵蓋類別數", f"{filtered_df['category'].nunique()} 類")
 with col4:
-    # 算出出現最多的關鍵詞
-    # (這裡簡化處理，實際建議拉出來算)
     st.metric("⭐ 關鍵詞焦點", "請看下方分析")
 
 st.markdown("---")
@@ -251,7 +245,6 @@ with tab2:
         # 設定字型檔名
         font_path = "NotoSansTC-VariableFont_wght.ttf" 
         
-        # 防呆機制：如果忘記上傳字型，改用預設 (雖然會變方塊，但至少不會報錯當機)
         import os
         if not os.path.exists(font_path):
             st.warning("⚠️ 警告：找不到中文字型檔，文字雲可能顯示為方塊。請上傳 .otf/.ttf 檔案。")

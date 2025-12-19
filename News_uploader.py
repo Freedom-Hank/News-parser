@@ -6,8 +6,8 @@ import hashlib
 
 # --- 設定區 ---
 JSON_FILE = "cleaned_news.json"
-KEY_FILE = "serviceAccountKey.json" # 你從 Firebase 下載的金鑰
-COLLECTION_NAME = "news" # 資料庫裡的集合名稱
+KEY_FILE = "serviceAccountKey.json" 
+COLLECTION_NAME = "news"
 
 def upload_to_firebase():
     # 1. 檢查金鑰是否存在
@@ -62,7 +62,7 @@ def upload_to_firebase():
             
             if link:
                 # 2. 把網址轉成 MD5 編碼 (例如: 'https://...' -> 'a1b2c3d4...')
-                # 這樣做是因為網址太長且含特殊符號，不適合直接當 Document ID
+                # 因為網址太長且含特殊符號，不適合直接當 Document ID
                 doc_id = hashlib.md5(link.encode('utf-8')).hexdigest()
                 
                 # 3. 指定 ID 寫入 (如果有重複的 ID，就會變成更新，不會新增)

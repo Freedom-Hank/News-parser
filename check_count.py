@@ -7,8 +7,7 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# 🔥 使用 count() 查詢
-# 這不會下載文件內容，只會叫 Firebase 幫你算數字
+# 🔥 使用 count() 查詢，叫 Firebase 算總數
 collection_ref = db.collection("news")
 count_query = collection_ref.count()
 
