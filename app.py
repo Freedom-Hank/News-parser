@@ -1,10 +1,9 @@
 import streamlit as st
 import firebase_admin
-from firebase_admin import credentials, firestore, initialize_app
+from firebase_admin import credentials, firestore
 import pandas as pd
 import plotly.express as px
 import os
-import json
 from datetime import datetime, timedelta
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
@@ -182,7 +181,7 @@ with st.sidebar:
         delta=f"本區間總庫存: {total_count} 筆",
         delta_color="off"
     )
-    st.caption(f"資料來源：ETtoday")
+    st.caption("資料來源：ETtoday")
 
 # ==========================================
 # 4. 主畫面資料過濾 (產生全域 filtered_df 給圖表用)
@@ -237,7 +236,8 @@ with tab2:
     # 這裡需要把所有 keywords 串接起來
     all_words = []
     for k in filtered_df['keywords']:
-        if isinstance(k, list): all_words.extend(k)
+        if isinstance(k, list): 
+            all_words.extend(k)
         
     if all_words:
         text = " ".join(all_words)

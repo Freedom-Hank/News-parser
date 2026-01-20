@@ -73,7 +73,7 @@ def upload_to_firebase():
         batch.commit()
         print(f"   ✅ 已寫入第 {i//batch_size + 1}/{total_batches} 批 (本批 {len(chunk)} 筆)")
 
-    print(f"🎉 上傳完畢！請去 Firebase Console 檢查資料。")
+    print("🎉 上傳完畢！請去 Firebase Console 檢查資料。")
 
 if __name__ == "__main__":
     upload_to_firebase()

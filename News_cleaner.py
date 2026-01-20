@@ -58,7 +58,8 @@ def extract_keywords_from_text(text):
     return filtered_keywords[:5] # 最後只取前 5 個
 
 def extract_reporter(content):
-    if pd.isna(content): return "Unknown"
+    if pd.isna(content): 
+        return "Unknown"
     patterns = [
         r"記者(.*?)[／|/]", 
         r"文[／|/](.*?)[\s|，|。]",
