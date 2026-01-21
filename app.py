@@ -37,40 +37,63 @@ db = firestore.client()
 # --- 2. 資料讀取與快取 (Cache) ---
 # 使用 @st.cache_data 避免每次按按鈕都重新去 Firebase 撈資料 (省流量、加速)
 @st.cache_data(ttl=600) 
-def load_data(start_date, end_date):
+def load_hybrid_data():
     """
-    根據使用者選擇的日期區間，去 Firebase 抓取資料。
+    1. 讀取 GitHub 上的 CSV (歷史資料)
+    2. 讀取 Firebase (最新資料)
+    3. 合併回傳
     """
-    # 確保日期是 datetime.date 類型，並轉成字串
-    try:
-        start_str = start_date.strftime("%Y/%m/%d")
-        end_str = end_date.strftime("%Y/%m/%d")
-    except AttributeError:
-        # 如果傳進來的不是日期物件 (例如是 None 或 Tuple)，這裡會抓到錯誤
-        return pd.DataFrame()
+    # --- Part A: 讀取歷史 CSV (本地檔案) ---
+    csv_file = "news_history.csv"
+    
+    if os.path.exists(csv_file):
+        try:
+            history_df = pd.read_csv(csv_file)
+            # 確保日期欄位是 datetime 物件，方便後面比較
+            history_df['date_obj'] = pd.to_datetime(history_df['date_str'])
+            last_date_in_csv = history_df['date_str'].max()
+            print(f"📂 [CSV] 載入歷史資料: {len(history_df)} 筆 (更新至 {last_date_in_csv})")
+        except Exception as e:
+            print(f"❌ 讀取 CSV 失敗: {e}")
+            history_df = pd.DataFrame()
+            last_date_in_csv = "2025-11-01" # 預設起點
+    else:
+        print("⚠️ 找不到 CSV 檔案，將只抓取 Firebase 資料")
+        history_df = pd.DataFrame()
+        last_date_in_csv = "2025-11-01"
 
+    # --- Part B: 抓取 Firebase 新資料 ---
+    # 只抓 CSV 最後一天 "之後" 的資料
+    print(f"📡 [Firebase] 正在檢查 {last_date_in_csv} 之後的新聞...")
+    
     try:
         docs = (
             db.collection("news")
-            .where("date_str", ">=", start_str)
-            .where("date_str", "<=", end_str)
+            .where("date_str", ">", last_date_in_csv)
             .stream()
         )
-        
-        data = []
-        for doc in docs:
-            data.append(doc.to_dict())
-        
-        if not data:
-            return pd.DataFrame()
-
-        df = pd.DataFrame(data)
-        df['date_obj'] = pd.to_datetime(df['date_str'], errors='coerce')
-        return df
-
+        new_data = [doc.to_dict() for doc in docs]
+        print(f"✅ [Firebase] 抓到新資料: {len(new_data)} 筆")
     except Exception as e:
-        st.error(f"資料讀取錯誤: {e}")
-        return pd.DataFrame()
+        print(f"❌ Firebase 讀取錯誤: {e}")
+        new_data = []
+
+    # --- Part C: 合併 ---
+    if new_data:
+        new_df = pd.DataFrame(new_data)
+        new_df['date_obj'] = pd.to_datetime(new_df['date_str'])
+        
+        # 把舊的跟新的接起來
+        if not history_df.empty:
+            full_df = pd.concat([history_df, new_df], ignore_index=True)
+        else:
+            full_df = new_df
+            
+        # 雙重保險：依連結去重複 (防止 CSV 跟 Firebase 重疊)
+        full_df = full_df.drop_duplicates(subset=['link'], keep='last')
+        return full_df
+    else:
+        return history_df
 
 # --- 3. 介面開始 ---
 st.set_page_config(
@@ -114,13 +137,22 @@ with st.sidebar:
 # ==========================================
 # 2. 核心動作：載入資料
 # ==========================================
-df = load_data(start_date, end_date)
+# 步驟 1: 先拿到 "完整資料庫" (這步有快取保護)
+full_df = load_hybrid_data()
 
-# 防呆：如果 df 是空的，顯示訊息並停止
+# 步驟 2: 根據使用者選的日期，在 "記憶體中" 切割資料
+if not full_df.empty:
+    # 這裡要做日期過濾，因為 load_hybrid_data 現在回傳的是從 11月 至今的所有資料
+    # 我們要把 start_date, end_date 轉成 datetime 才能跟 date_obj 比較
+    mask = (full_df['date_obj'].dt.date >= start_date) & (full_df['date_obj'].dt.date <= end_date)
+    df = full_df[mask]
+else:
+    df = pd.DataFrame()
+
+# 防呆：如果 df 是空的
 if df.empty:
     st.warning(f"⚠️ 在 {start_date} 到 {end_date} 之間找不到新聞資料。")
     st.stop()
-
 # ==========================================
 # 3. 側邊欄 Part B：類別與記者篩選
 # ==========================================
