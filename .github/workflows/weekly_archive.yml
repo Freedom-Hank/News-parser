@@ -1,0 +1,44 @@
+name: Weekly Data Archive 📦
+
+on:
+  schedule:
+    # 這裡設定時間：每週一的凌晨 00:00 (UTC) 執行
+    # 你可以用 https://crontab.guru/ 來調整時間
+    - cron: '0 0 * * 1' 
+  
+  # 允許你手動按按鈕觸發 (方便測試用)
+  workflow_dispatch:
+
+permissions:
+  contents: write  # 給予機器人寫入 Repo 的權限 (重要！)
+
+jobs:
+  update-csv:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install pandas firebase-admin
+
+      - name: Run Update Script
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: python update_csv.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add news_history.csv
+          # 如果沒有變更，commit 會失敗，所以加個 || echo 防止報錯
+          git commit -m "chore: auto-archive weekly news data" || echo "No changes to commit"
+          git push
