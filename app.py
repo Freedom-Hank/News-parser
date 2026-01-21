@@ -7,6 +7,7 @@ import os
 from datetime import datetime, timedelta
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
+import ast
 
 
 # --- 1. 初始化 Firebase (只執行一次) ---
@@ -265,9 +266,29 @@ with tab2:
     st.subheader("熱門關鍵詞文字雲")
     # 這裡需要把所有 keywords 串接起來
     all_words = []
-    for k in filtered_df['keywords']:
-        if isinstance(k, list): 
-            all_words.extend(k)
+    if 'keywords' in filtered_df.columns:
+        for k in filtered_df['keywords']:
+            if k is None:
+                continue
+                
+            # 狀況 1: 它是 list (從 Firebase 直接來)
+            if isinstance(k, list):
+                all_words.extend(k)
+                
+            # 狀況 2: 它是 string (從 CSV 讀取，格式像 "['a', 'b']")
+            elif isinstance(k, str):
+                try:
+                    # 嘗試解析字串列表
+                    parsed = ast.literal_eval(k)
+                    if isinstance(parsed, list):
+                        all_words.extend(parsed)
+                    else:
+                        all_words.append(k) # 解析出來不是 list，就當單字
+                except:
+                    # 解析失敗，就直接當作一個單字
+                    all_words.append(k)
+    else:
+        st.error("資料中找不到 'keywords' 欄位，請檢查爬蟲資料")
         
     if all_words:
         text = " ".join(all_words)
@@ -285,9 +306,16 @@ with tab2:
         # 建立文字雲物件，並指定 font_path
         wc = WordCloud(
             font_path=use_font,
-            width=800, 
-            height=400, 
-            background_color="white"
+            width=1200, 
+            height=800, 
+            background_color="black",
+
+            max_words=200,
+            colormap='viridis',
+            prefer_horizontal=0.9,
+            relative_scaling=0.5,
+
+            margin=10,
         ).generate(text)
 
         # 畫圖
