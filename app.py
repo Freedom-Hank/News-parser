@@ -114,12 +114,12 @@ with st.sidebar:
     st.header("⚙️ 篩選控制")
     
     # 設定預設值
-    default_start = datetime.now().date() - timedelta(days=3)
+    default_start = datetime.now().date() - timedelta(days=7)
     default_end = datetime.now().date()
 
     # 日期選擇器
     date_range = st.date_input(
-        "📅 選擇資料日期區間 (建議範圍勿過大)", 
+        "📅 選擇資料日期區間", 
         (default_start, default_end), 
         max_value=datetime.now().date()
     )
@@ -128,8 +128,6 @@ with st.sidebar:
         start_date, end_date = date_range
         
         days_diff = (end_date - start_date).days
-        if days_diff > 7:
-            st.warning(f"⚠️ 您選擇了 {days_diff} 天，讀取會花一點時間。")
     else:
         st.info("請選擇結束日期")
         st.stop() # 這裡停住，等待使用者選完日期
