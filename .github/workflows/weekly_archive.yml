@@ -1,4 +1,4 @@
-name: Weekly Data Archive 📦
+name: Weekly Data Archive
 
 on:
   schedule:
@@ -6,11 +6,11 @@ on:
     # 你可以用 https://crontab.guru/ 來調整時間
     - cron: '0 0 * * 1' 
   
-  # 允許你手動按按鈕觸發 (方便測試用)
+  # 允許你手動按按鈕觸發
   workflow_dispatch:
 
 permissions:
-  contents: write  # 給予機器人寫入 Repo 的權限 (重要！)
+  contents: write
 
 jobs:
   update-csv:
