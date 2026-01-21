@@ -28,23 +28,39 @@
     * 整合 GitHub Actions，每日定時自動執行爬蟲與資料更新。
     * 自動執行「爬取 -> 清洗 -> 去重 -> 上傳」流程，無需人工介入。
     * 實作 Secrets 管理，確保雲端金鑰安全。
+* **成本效益最佳化架構 (Cost-Efficient Architecture)**：
+    * 冷熱資料分離：採用混合讀取模式 (Hybrid Loading)，將歷史資料封存為 CSV (Cold Data)，僅即時資料讀取 Firebase (Hot Data)。
+    * 流量節省：大幅降低 Firestore 讀取頻率，解決 NoSQL 資料庫隨著資料量增長而產生的讀取成本問題。
+    * 自動歸檔機制：每週自動將 Firebase 舊資料備份回 GitHub Repo，實現永久免費的歷史資料儲存。
 
 ## 🛠️ 系統架構
 
 ```mermaid
-graph LR
-    A[GitHub Actions / Local] -->|執行爬蟲| B(News_crawler.py)
-    B -->|原始資料| C(news_cleaner.py)
-    C -->|清洗後資料| D(news_uploader.py)
-    D -->|上傳| E[(Firebase Firestore)]
-    F[User] -->|訪問| G[Streamlit Dashboard]
-    G <-->|讀取數據| E
+graph TD
+    subgraph "Daily Routine (Hot Data)"
+    A[GitHub Actions<br>每6小時] -->|"執行爬蟲"| B(News_crawler / Pipeline)
+    B -->|"寫入新資料"| C[(Firebase Firestore)]
+    end
+
+    subgraph "Weekly Archive (Cold Data)"
+    C -->|"讀取舊資料"| D(update_csv.py)
+    D -->|"產生/更新"| E(news_history.csv)
+    D -->|"Git Commit & Push"| F[GitHub Repo]
+    end
+
+    subgraph "Dashboard (Hybrid Loading)"
+    G[User] -->|"訪問"| H[Streamlit App]
+    H <-->|"讀取歷史"| E
+    H <-->|"讀取即時"| C
+    end
 ```
 ## 📂 檔案結構說明
 
 | 檔名 | 類別 | 說明 |
 | :--- | :--- | :--- |
 | `app.py` | 應用程式 | Streamlit 戰情室主程式，負責前端介面與資料視覺化 |
+|`update_csv.py`|	自動化工具|資料歸檔核心，負責將 Firebase 資料增量備份至 CSV 並推送到 GitHub|
+|`news_history.csv`|資料庫|冷資料儲存區，存放歷史新聞數據 (由 Action 自動更新)|
 | `News_crawler.py` | 資料管線 | 爬蟲核心，負責從新聞網站抓取原始 HTML 資料 |
 | `news_cleaner.py` | 資料管線 | 負責資料清洗、欄位標準化 (ETL Process) |
 | `news_uploader.py` | 資料管線 | 負責產生去重 ID 並將資料上傳至 Firestore |
@@ -83,12 +99,38 @@ streamlit run app.py
 ```
 
 ## ☁️ 部署 (Deployment)
-GitHub Actions (後端自動化)
-本專案包含 .github/workflows/daily_scrape.yml，設定為 每天 UTC 00:00 (台灣時間 06:00) / UTC 06:00 (台灣時間 14:00) / UTC 12:00 (台灣時間 20:00) / UTC 18:00 (台灣時間 02:00)自動執行爬蟲。
 
-需在 GitHub Repo Settings 中設定 Secrets: FIREBASE_CREDENTIALS。
+本專案採用 **前後端分離** 的部署策略，確保資料流與介面運作的獨立性與穩定性。
 
-Streamlit Cloud (前端網頁)
-本專案支援直接部署至 Streamlit Community Cloud。
+### ⚙️ 後端自動化 (GitHub Actions)
+本專案設計了 **雙軌並行 (Dual-Track)** 的自動化策略，由 GitHub Actions 全權託管：
 
-需在 Streamlit Cloud 的 Advanced Settings 中設定 Secrets ([firebase]).
+1.  **🔥 資料蒐集 (Data Collection)**
+    * **設定檔**：`news_scraper.yml`
+    * **頻率**：每 6 小時執行一次
+    * **任務**：執行爬蟲腳本，並將最新資料即時寫入 **Firebase (熱區)**。
+
+2.  **❄️ 資料歸檔 (Data Archiving)**
+    * **設定檔**：`weekly_archive.yml`
+    * **頻率**：每週一 08:00 (UTC+8) 執行
+    * **任務**：將 Firebase 中的資料增量備份至 `news_history.csv` **(冷區)** 並 Commit 回 GitHub，實現 **長期儲存零成本**。
+
+> 🔑 **Secrets 設定**：
+> 請至 GitHub Repo 的 `Settings` > `Secrets and variables` > `Actions`，新增 Secret：
+> * Key: `FIREBASE_CREDENTIALS`
+> * Value: (貼上 `serviceAccountKey.json` 的完整內容)
+
+---
+
+### 🖥️ 前端網頁 (Streamlit Cloud)
+本專案支援一鍵部署至 **Streamlit Community Cloud**，且具備自動同步 GitHub 更新的功能。
+
+> 🔑 **Secrets 設定**：
+> 請至 Streamlit App 的 `Settings` > `Secrets`，貼上以下格式的 TOML 設定：
+>
+> ```toml
+> [firebase]
+> type = "service_account"
+> project_id = "..."
+> # ... (其他欄位)
+> ```
