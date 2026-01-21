@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import ast
+import numpy as np
 
 
 # --- 1. 初始化 Firebase (只執行一次) ---
@@ -293,6 +294,12 @@ with tab2:
     if all_words:
         text = " ".join(all_words)
         
+        # 建立一個 800x800 的網格
+        x, y = np.ogrid[:800, :800]
+        # 計算圓心距離 (中心點 400, 400，半徑 380)
+        mask = (x - 400) ** 2 + (y - 400) ** 2 > 380 ** 2
+        mask = 255 * mask.astype(int)
+
         # 設定字型檔名
         font_path = "NotoSansTC-VariableFont_wght.ttf" 
         
@@ -305,24 +312,27 @@ with tab2:
 
         # 建立文字雲物件，並指定 font_path
         wc = WordCloud(
-            font_path=use_font,
-            width=1200, 
-            height=800, 
-            background_color="black",
+            font_path=font_path,
+            background_color="white",
+            mask=mask, 
+            max_words=100, 
+            max_font_size=150,
+            min_font_size=10,
+            colormap='Accent', 
 
-            max_words=200,
-            colormap='viridis',
-            prefer_horizontal=0.9,
-            relative_scaling=0.5,
-
-            margin=10,
+            contour_width=0,          
+            width=800,
+            height=800,
         ).generate(text)
 
-        # 畫圖
-        fig, ax = plt.subplots()
-        ax.imshow(wc, interpolation='bilinear')
-        ax.axis("off")
-        st.pyplot(fig)
+        col_L, col_Main, col_R = st.columns([1, 2, 1]) 
+        
+        with col_Main:
+            fig, ax = plt.subplots(figsize=(6, 6)) # 設定畫布大小
+            ax.imshow(wc, interpolation='bilinear')
+            ax.axis("off") # 關掉座標軸
+            st.pyplot(fig, use_container_width=True)
+            
     else:
         st.info("無關鍵詞資料")
 
