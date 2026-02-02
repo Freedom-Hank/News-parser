@@ -1,0 +1,9 @@
+name: Debug Test
+on: workflow_dispatch
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Say Hello
+        run: echo "GitHub, are you there?"
