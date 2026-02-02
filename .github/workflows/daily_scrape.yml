@@ -9,34 +9,60 @@ on:
   workflow_dispatch:
 
 jobs:
-  scrape-and-upload:
+  try-ubuntu:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code (下載程式碼)
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python (安裝 Python)
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.10'
 
       - name: Install dependencies (安裝套件)
         run: |
           pip install -r requirements.txt
-
-      - name: Run Crawler (執行爬蟲 - 這裡我們用 1 天就好，因為是每天跑)
-        # 這裡可以直接傳參數給 python，或是你去改 python 檔預設值
-        run: python News_crawler.py
-        # 注意：你需要確認 News_crawler.py 裡的 DAYS_TO_CRAWL 設為 1 (或動態調整)
-      
-      - name: Run Cleaner (執行清洗)
-        run: python News_cleaner.py
 
       - name: Create Firebase Key File (產生金鑰檔案)
         env:
           FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
         run: echo "$FIREBASE_CREDENTIALS" > serviceAccountKey.json
 
-      - name: Run Uploader (上傳 Firebase)
-        run: python News_uploader.py
+      - name: Run Pipeline (爬蟲 -> 清洗 -> 上傳)
+        run: |
+          python News_crawler.py
+          python News_cleaner.py
+          python News_uploader.py
+
+# === 第二棒：備援 Windows (只有在 Ubuntu 失敗時才會跑) ===
+  fallback-windows:
+    needs: try-ubuntu
+    if: failure()
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code (下載程式碼)
+        uses: actions/checkout@v4
+
+      - name: Set up Python (安裝 Python)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies (安裝套件)
+        run: |
+          pip install -r requirements.txt
+
+      - name: Create Firebase Key File (產生金鑰檔案)
+        shell: pwsh
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+        run: $env:FIREBASE_CREDENTIALS | Out-File -FilePath serviceAccountKey.json -Encoding utf8
+
+      - name: Run Pipeline (爬蟲 -> 清洗 -> 上傳)
+        run: |
+          python News_crawler.py
+          python News_cleaner.py
+          python News_uploader.py
