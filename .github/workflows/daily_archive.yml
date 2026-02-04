@@ -2,9 +2,7 @@ name: Weekly Data Archive
 
 on:
   schedule:
-    # 這裡設定時間：每週一的凌晨 00:00 (UTC) 執行
-    # 你可以用 https://crontab.guru/ 來調整時間
-    - cron: '0 0 * * 1' 
+    - cron: '0 20 * * *'
   
   # 允許你手動按按鈕觸發
   workflow_dispatch:
