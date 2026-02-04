@@ -1,4 +1,4 @@
-name: Weekly Data Archive
+name: Daily Data Archive
 
 on:
   schedule:
