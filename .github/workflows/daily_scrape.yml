@@ -7,7 +7,9 @@ on:
     - cron: '0 */6 * * *'
   # 允許你手動按按鈕觸發 (方便測試)
   workflow_dispatch:
-
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  
 jobs:
   try-ubuntu:
     runs-on: ubuntu-latest
